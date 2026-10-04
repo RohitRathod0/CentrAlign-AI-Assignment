@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Invoices{% endblock %}
+{% block content %}
+<h1>Invoices</h1>
+<form method="get" action="/invoices" id="filter-form">
+  <label for="q">Search invoice number or vendor</label>
+  <input id="q" name="q" type="search" value="{{ q }}">
+  <label for="status">Status</label>
+  <select id="status" name="status">
+    <option value="" {% if not status %}selected{% endif %}>All</option>
+    <option value="unpaid" {% if status == "unpaid" %}selected{% endif %}>Unpaid</option>
+    <option value="paid" {% if status == "paid" %}selected{% endif %}>Paid</option>
+  </select>
+  <button type="submit" id="filter-submit">Filter</button>
+</form>
+<table id="invoices-table">
+  <thead><tr><th>Record</th><th>Invoice no</th><th>Vendor</th><th>Amount</th><th>Due date</th><th>Status</th></tr></thead>
+  <tbody>
+  {% for i in invoices %}
+    <tr>
+      <td><a href="/invoices/{{ i.id }}">{{ i.record_id }}</a></td>
+      <td>{{ i.invoice_number }}</td><td>{{ i.vendor_name }}</td>
+      <td>{{ "%.2f"|format(i.amount) }} {{ i.currency }}</td><td>{{ i.due_date }}</td><td>{{ i.status }}</td>
+    </tr>
+  {% else %}<tr><td colspan="6">No invoices.</td></tr>{% endfor %}
+  </tbody>
+</table>
+{% endblock %}

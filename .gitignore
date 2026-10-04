@@ -1,0 +1,28 @@
+# Secrets (only .env.example is committed)
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+*.egg-info/
+
+# Generated mock-app data (recreated by seed.py / on app start)
+mock_env/maildesk/data/
+mock_env/ledgerops/data/
+
+# Run outputs: screenshots, downloaded PDFs, run database, logs
+artifacts/*
+!artifacts/.gitkeep
+*.db
+*.log
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Inbox{% endblock %}
+{% block content %}
+<h1>Inbox</h1>
+<form method="get" action="/inbox" id="search-form">
+  <label for="q">Search sender or subject</label>
+  <input id="q" name="q" type="search" value="{{ q }}">
+  <button type="submit" id="search-submit">Search</button>
+</form>
+<p>{{ total }} message(s){% if q %} matching "{{ q }}"{% endif %}. Newest first.</p>
+<table id="inbox-table">
+  <thead><tr><th>From</th><th>Subject</th><th>Date</th><th>Attachment</th></tr></thead>
+  <tbody>
+  {% for e in emails %}
+    <tr>
+      <td>{{ e.from_name }} &lt;{{ e.from_email }}&gt;</td>
+      <td><a href="/email/{{ e.id }}">{{ e.subject }}</a></td>
+      <td>{{ e.sent_at }}</td>
+      <td>{% if e.n_attach %}<span title="has attachment">PDF attached</span>{% endif %}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+<p>Page {{ page }} of {{ pages }}
+  {% if page > 1 %}<a href="/inbox?q={{ q }}&page={{ page - 1 }}" id="prev-page">Previous</a>{% endif %}
+  {% if page < pages %}<a href="/inbox?q={{ q }}&page={{ page + 1 }}" id="next-page">Next</a>{% endif %}
+</p>
+{% endblock %}

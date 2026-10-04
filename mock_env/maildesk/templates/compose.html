@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Compose{% endblock %}
+{% block content %}
+<h1>New message</h1>
+<form method="post" action="/send" id="compose-form">
+  <label for="to">To</label>
+  <input id="to" name="to" type="email" required>
+  <label for="subject">Subject</label>
+  <input id="subject" name="subject" type="text" required>
+  <label for="body">Message</label>
+  <textarea id="body" name="body" rows="8"></textarea>
+  <button type="submit" id="send-submit">Send</button>
+</form>
+{% endblock %}

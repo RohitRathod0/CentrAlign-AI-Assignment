@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}{{ email.subject }}{% endblock %}
+{% block content %}
+<h1>{{ email.subject }}</h1>
+<p><strong>From:</strong> {{ email.from_name }} &lt;{{ email.from_email }}&gt;<br>
+   <strong>To:</strong> {{ email.to_email }}<br>
+   <strong>Date:</strong> {{ email.sent_at }}</p>
+<pre id="email-body">{{ email.body }}</pre>
+{% if attachments %}
+<h2>Attachments</h2>
+<ul id="attachments">
+  {% for a in attachments %}<li><a href="/attachments/{{ a.id }}">{{ a.filename }}</a></li>{% endfor %}
+</ul>
+{% endif %}
+<p><a href="/inbox">Back to inbox</a></p>
+{% endblock %}

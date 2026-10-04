@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}{{ invoice.record_id }}{% endblock %}
+{% block content %}
+{% if created %}<p class="ok" role="status" id="created-banner">Invoice {{ invoice.record_id }} created</p>{% endif %}
+{% if paid %}<p class="ok" role="status">Invoice {{ invoice.record_id }} marked as paid</p>{% endif %}
+<h1>Invoice {{ invoice.record_id }}</h1>
+<table id="invoice-detail">
+  <tr><th>Record ID</th><td id="record-id">{{ invoice.record_id }}</td></tr>
+  <tr><th>Invoice number</th><td>{{ invoice.invoice_number }}</td></tr>
+  <tr><th>Vendor</th><td>{{ invoice.vendor_name }}</td></tr>
+  <tr><th>Amount</th><td>{{ "%.2f"|format(invoice.amount) }} {{ invoice.currency }}</td></tr>
+  <tr><th>Due date</th><td>{{ invoice.due_date }}</td></tr>
+  <tr><th>Status</th><td>{{ invoice.status }}</td></tr>
+  <tr><th>Notes</th><td>{{ invoice.notes }}</td></tr>
+  <tr><th>Created at</th><td>{{ invoice.created_at }}</td></tr>
+</table>
+{% if invoice.status != "paid" %}
+<form method="post" action="/invoices/{{ invoice.id }}/mark-paid" id="mark-paid-form">
+  <button type="submit" id="mark-paid-submit">Mark as paid</button>
+</form>
+{% endif %}
+<p><a href="/invoices">Back to invoices</a></p>
+{% endblock %}

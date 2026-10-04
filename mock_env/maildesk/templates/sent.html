@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Sent{% endblock %}
+{% block content %}
+<h1>Sent messages</h1>
+{% if ok %}<p class="ok" role="status">Message sent.</p>{% endif %}
+<table id="sent-table">
+  <thead><tr><th>To</th><th>Subject</th><th>Sent at</th></tr></thead>
+  <tbody>
+  {% for m in messages %}<tr><td>{{ m.to_email }}</td><td>{{ m.subject }}</td><td>{{ m.sent_at }}</td></tr>
+  {% else %}<tr><td colspan="3">No sent messages.</td></tr>{% endfor %}
+  </tbody>
+</table>
+{% endblock %}

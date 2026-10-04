@@ -1,0 +1,271 @@
+<!doctype html>
+<!--
+WHAT: Worker console. One static page, vanilla JS, no build step (PRD 4):
+      task box + run options, live trace, plan and facts, approval /
+      clarification prompts, verification result, summary with evidence.
+
+WHY:  It is the demo surface. Every panel is rendered only from the run's
+      event stream (GET /api/runs/{id}/events via EventSource). Opening an old
+      run replays its stored events through the same code path, so a live run
+      and a replayed run look identical.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Worker Console</title>
+<style>
+  :root { --bg:#f4f5f7; --card:#fff; --ink:#1b1f27; --muted:#667085; --line:#e4e7ec;
+          --ok:#127a3d; --err:#b42318; --warn:#b54708; --accent:#3538cd; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:14px/1.45 system-ui, sans-serif; background:var(--bg); color:var(--ink); }
+  header { padding:12px 20px; background:#101828; color:#fff; display:flex; gap:16px; align-items:center; }
+  header h1 { font-size:16px; margin:0; }
+  header span { color:#98a2b3; font-size:13px; }
+  .layout { display:grid; grid-template-columns: 320px 1fr; gap:16px; padding:16px; }
+  @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:14px; margin-bottom:16px; }
+  .card h2 { font-size:13px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); margin:0 0 10px; }
+  textarea, input[type=number], input[type=text] { width:100%; padding:8px; border:1px solid var(--line); border-radius:6px; font:inherit; }
+  textarea { min-height:90px; resize:vertical; }
+  label.inline { display:flex; gap:6px; align-items:center; margin-top:8px; }
+  button { padding:7px 12px; border:0; border-radius:6px; background:var(--accent); color:#fff; cursor:pointer; font:inherit; }
+  button.secondary { background:#eef0f6; color:var(--ink); }
+  button.danger { background:var(--err); }
+  button:disabled { opacity:.5; cursor:default; }
+  .examples button { display:block; width:100%; text-align:left; margin-top:6px; background:#eef0f6; color:var(--ink); font-size:12px; }
+  .runs a { display:block; padding:6px 0; border-bottom:1px solid var(--line); color:var(--ink); text-decoration:none; font-size:12px; }
+  .pill { display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; background:#eef0f6; }
+  .pill.completed { background:#dcfae6; color:var(--ok); } .pill.failed, .pill.cancelled { background:#fee4e2; color:var(--err); }
+  .pill.awaiting_approval, .pill.awaiting_clarification { background:#fef0c7; color:var(--warn); }
+  .top { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+  .counters { color:var(--muted); font-size:12px; }
+  .grid2 { display:grid; grid-template-columns: 1fr 1fr; gap:16px; }
+  @media (max-width: 1200px) { .grid2 { grid-template-columns: 1fr; } }
+  #request { border:2px solid var(--warn); display:none; }
+  #request .options button { margin:6px 6px 0 0; }
+  .subgoal { padding:3px 0; } .subgoal b { display:inline-block; width:62px; font-size:11px; color:var(--muted); }
+  .subgoal.done b { color:var(--ok); } .subgoal.active b { color:var(--accent); }
+  table { width:100%; border-collapse:collapse; font-size:12px; } td, th { text-align:left; padding:4px; border-bottom:1px solid var(--line); vertical-align:top; }
+  #trace { max-height:70vh; overflow:auto; font-size:12.5px; }
+  .ev { padding:6px 0; border-bottom:1px solid var(--line); }
+  .ev .tool { font-weight:600; } .ev .why { color:var(--muted); }
+  .ev pre { white-space:pre-wrap; margin:4px 0 0; font:12px/1.4 ui-monospace, monospace; background:#f9fafb; padding:6px; border-radius:4px; max-height:160px; overflow:auto; }
+  .ev.err pre { background:#fef3f2; } .ev.sys { color:var(--muted); }
+  .badge { font-size:11px; padding:1px 6px; border-radius:4px; background:#eef0f6; margin-left:6px; }
+  .badge.write { background:#fef0c7; } .badge.critical { background:#fee4e2; }
+  img.thumb { max-width:220px; border:1px solid var(--line); border-radius:4px; margin-top:4px; display:block; }
+  .gallery { display:flex; gap:8px; flex-wrap:wrap; }
+  .check.pass { color:var(--ok); } .check.fail { color:var(--err); }
+  .muted { color:var(--muted); }
+</style>
+</head>
+<body>
+<header><h1>Worker</h1><span>autonomous AI task worker: plan, act, observe, recover, verify</span></header>
+<div class="layout">
+  <aside>
+    <div class="card">
+      <h2>New task</h2>
+      <textarea id="task" placeholder="Describe the task in plain language"></textarea>
+      <label class="inline"><input type="checkbox" id="chaos"> Chaos mode (inject failures)</label>
+      <label class="inline"><input type="checkbox" id="headless"> Headless browser</label>
+      <label class="inline">Max steps <input type="number" id="maxSteps" value="40" min="5" max="100" style="width:80px"></label>
+      <label class="inline">Approval threshold (INR) <input type="number" id="threshold" value="100000" style="width:110px"></label>
+      <p><button id="start">Start run</button></p>
+      <div class="examples" id="examples"></div>
+    </div>
+    <div class="card"><h2>Recent runs</h2><div class="runs" id="runs"></div></div>
+  </aside>
+  <main>
+    <div class="card">
+      <div class="top">
+        <strong id="runTitle" class="muted">No run selected</strong>
+        <span id="status" class="pill">-</span>
+        <span id="counters" class="counters"></span>
+        <button id="cancel" class="danger" style="display:none">Cancel</button>
+      </div>
+    </div>
+    <div class="card" id="request">
+      <h2 id="requestKind">Input needed</h2>
+      <p id="requestQuestion"></p>
+      <p id="requestReason" class="muted"></p>
+      <div class="options" id="requestOptions"></div>
+      <input type="text" id="requestAnswer" placeholder="Your answer / reason">
+      <p id="requestButtons"></p>
+    </div>
+    <div class="card" id="summaryCard" style="display:none"><h2>Result</h2><div id="summary"></div></div>
+    <div class="grid2">
+      <div>
+        <div class="card"><h2>Plan</h2><div id="plan" class="muted">-</div></div>
+        <div class="card"><h2>Working memory</h2><div id="facts" class="muted">-</div></div>
+        <div class="card"><h2>Verification</h2><div id="verification" class="muted">-</div></div>
+      </div>
+      <div class="card"><h2>Live trace</h2><div id="trace"></div></div>
+    </div>
+  </main>
+</div>
+<script>
+const EXAMPLES = [
+  "Find the latest invoice from Acme Corp in the inbox and enter it into LedgerOps.",
+  "Find the latest invoice from Acme in the inbox and enter it into LedgerOps.",
+  "Enter the Initech invoice from the inbox into LedgerOps.",
+  "Enter the Globex Ltd invoice from the inbox into LedgerOps.",
+];
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let currentRun = null, source = null, facts = {}, pending = null;
+
+for (const t of EXAMPLES) {
+  const b = document.createElement("button"); b.textContent = t; b.onclick = () => $("task").value = t;
+  $("examples").appendChild(b);
+}
+
+async function api(path, opts = {}) {
+  const r = await fetch(path, { headers: { "Content-Type": "application/json" }, ...opts });
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || r.statusText);
+  return r.json();
+}
+
+async function loadRuns() {
+  const runs = await api("/api/runs");
+  $("runs").innerHTML = runs.map(r =>
+    `<a href="#" data-id="${r.id}"><span class="pill ${r.status}">${r.status}</span> ${esc(r.task)}</a>`).join("") || '<span class="muted">none yet</span>';
+  $("runs").querySelectorAll("a").forEach(a => a.onclick = e => { e.preventDefault(); openRun(a.dataset.id); });
+}
+
+$("start").onclick = async () => {
+  const task = $("task").value.trim(); if (!task) return;
+  $("start").disabled = true;
+  try {
+    const run = await api("/api/runs", { method: "POST", body: JSON.stringify({ task, options: {
+      chaos: $("chaos").checked, headless: $("headless").checked,
+      max_steps: +$("maxSteps").value, approval_threshold_inr: +$("threshold").value } }) });
+    openRun(run.id); loadRuns();
+  } catch (e) { alert(e.message); }
+  $("start").disabled = false;
+};
+
+$("cancel").onclick = () => currentRun && api(`/api/runs/${currentRun}/cancel`, { method: "POST" }).catch(e => alert(e.message));
+
+function reset() {
+  facts = {}; pending = null;
+  for (const id of ["trace", "summary"]) $(id).innerHTML = "";
+  $("plan").textContent = "-"; $("facts").textContent = "-"; $("verification").textContent = "-";
+  $("summaryCard").style.display = "none"; $("request").style.display = "none";
+}
+
+async function openRun(id) {
+  if (source) source.close();
+  currentRun = id; reset();
+  const run = await api(`/api/runs/${id}`);
+  $("runTitle").textContent = run.task; $("runTitle").classList.remove("muted");
+  renderRun(run);
+  source = new EventSource(`/api/runs/${id}/events`);
+  source.onmessage = m => handle(JSON.parse(m.data));
+}
+
+function renderRun(run) {
+  $("status").textContent = run.status; $("status").className = "pill " + run.status;
+  const c = run.counters;
+  $("counters").textContent = `steps ${run.steps.length} · retries ${c.retries} · replans ${c.replans} · ` +
+    `LLM calls ${c.llm_calls} · tokens ${c.input_tokens}+${c.output_tokens}`;
+  $("cancel").style.display = ["completed", "failed", "cancelled"].includes(run.status) ? "none" : "";
+}
+
+function trace(html, cls = "") {
+  const div = document.createElement("div"); div.className = "ev " + cls; div.innerHTML = html;
+  $("trace").appendChild(div); $("trace").scrollTop = $("trace").scrollHeight;
+}
+
+const shot = p => p ? `<a href="/artifacts/${p}" target="_blank"><img class="thumb" src="/artifacts/${p}" loading="lazy"></a>` : "";
+
+function handle(ev) {
+  const d = ev.data;
+  switch (ev.type) {
+    case "status":
+      api(`/api/runs/${ev.run_id}`).then(renderRun);
+      trace(`status → <b>${d.status}</b>`, "sys");
+      if (["completed", "failed", "cancelled"].includes(d.status)) { $("request").style.display = "none"; loadRuns(); }
+      break;
+    case "plan":
+      $("plan").classList.remove("muted");
+      $("plan").innerHTML = `<p><b>Objective:</b> ${esc(d.spec.objective)}</p><p><b>Success criteria</b></p><ul>` +
+        d.spec.success_criteria.map(c => `<li>${esc(c)}</li>`).join("") + `</ul><p><b>Subgoals (v${d.plan.version})</b></p>` +
+        d.plan.subgoals.map(s => `<div class="subgoal ${s.status}"><b>${s.status}</b>${esc(s.id)}: ${esc(s.description)}</div>`).join("");
+      if (d.replan) trace(`<b>Replanned</b>: ${esc(d.reason)}`, "sys");
+      break;
+    case "action":
+      trace(`#${d.step} <span class="tool">${esc(d.tool)}</span><span class="badge ${d.risk || ""}">${d.risk || ""}</span>
+             <code>${esc(JSON.stringify(d.args)).slice(0, 200)}</code><div class="why">${esc(d.rationale)}</div>`);
+      break;
+    case "observation":
+      trace(`${d.ok ? "✓" : "✗"} step ${d.step}${d.attempt > 1 ? ` (retry ${d.attempt})` : ""} · ${d.duration_ms} ms
+             <pre>${esc(d.summary)}</pre>${shot(d.screenshot)}`, d.ok ? "" : "err");
+      break;
+    case "error_handling":
+      trace(`↻ ${d.kind} ×${d.consecutive} → <b>${d.handling}</b>${d.backoff_s ? ` (backoff ${d.backoff_s}s)` : ""}`, "sys");
+      break;
+    case "fact_saved":
+      facts[d.key] = d; $("facts").classList.remove("muted");
+      $("facts").innerHTML = "<table><tr><th>Key</th><th>Value</th><th>Source</th></tr>" + Object.values(facts).map(f =>
+        `<tr><td>${esc(f.key)}</td><td>${esc(f.value)}</td><td class="muted">${esc(f.source)} (step ${f.step})</td></tr>`).join("") + "</table>";
+      break;
+    case "approval_requested": case "clarification_requested":
+      showRequest(d); break;
+    case "human_response":
+      $("request").style.display = "none";
+      trace(`human: ${d.approved === true ? "approved" : d.approved === false ? "denied" : ""} ${esc(d.answer || "")}`, "sys");
+      break;
+    case "verifier_step":
+      trace(`[verifier] GET ${esc(d.url)} ${esc(JSON.stringify(d.params || {}))}<pre>${esc(d.summary)}</pre>`, "sys");
+      break;
+    case "verification":
+      $("verification").classList.remove("muted");
+      $("verification").innerHTML = `<p><b class="check ${d.passed ? "pass" : "fail"}">${d.passed ? "PASSED" : "FAILED"}</b></p>` +
+        d.checks.map(c => `<p class="check ${c.passed ? "pass" : "fail"}">${c.passed ? "✓" : "✗"} [${c.method}] ${esc(c.criterion)}<br>
+        <span class="muted">${esc(c.evidence)}</span></p>`).join("") + (d.feedback ? `<p class="muted">Feedback: ${esc(d.feedback)}</p>` : "");
+      break;
+    case "run_completed": case "run_failed":
+      $("summaryCard").style.display = "";
+      const shots = d.evidence.filter(e => e.startsWith("screenshot: ")).map(e => e.slice(12));
+      $("summary").innerHTML = `<p><span class="pill ${d.status}">${d.status}</span> ${esc(d.summary)}</p><ul>` +
+        d.evidence.filter(e => !e.startsWith("screenshot: ")).map(e => `<li>${esc(e)}</li>`).join("") + "</ul>" +
+        `<div class="gallery">${shots.map(shot).join("")}</div>`;
+      source && source.close();
+      break;
+  }
+}
+
+function showRequest(req) {
+  pending = req;
+  $("request").style.display = "";
+  $("requestKind").textContent = req.kind === "approval" ? "Approval needed" : "Clarification needed";
+  $("requestQuestion").textContent = req.question;
+  $("requestReason").textContent = req.reason ? "Policy: " + req.reason : "";
+  $("requestAnswer").value = "";
+  $("requestOptions").innerHTML = "";
+  for (const o of req.options || []) {
+    const b = document.createElement("button"); b.className = "secondary"; b.textContent = o;
+    b.onclick = () => respond({ answer: o }); $("requestOptions").appendChild(b);
+  }
+  $("requestButtons").innerHTML = "";
+  const add = (label, cls, body) => { const b = document.createElement("button"); b.textContent = label; b.className = cls;
+    b.onclick = () => respond(body()); $("requestButtons").appendChild(b); b.style.marginRight = "8px"; };
+  if (req.kind === "approval") {
+    add("Approve", "", () => ({ approved: true, answer: $("requestAnswer").value || null }));
+    add("Deny", "danger", () => ({ approved: false, answer: $("requestAnswer").value || "denied" }));
+  } else {
+    add("Send answer", "", () => ({ answer: $("requestAnswer").value }));
+  }
+}
+
+async function respond(body) {
+  if (!pending) return;
+  try { await api(`/api/runs/${currentRun}/respond`, { method: "POST", body: JSON.stringify({ request_id: pending.id, ...body }) }); }
+  catch (e) { alert(e.message); }
+}
+
+loadRuns();
+</script>
+</body>
+</html>

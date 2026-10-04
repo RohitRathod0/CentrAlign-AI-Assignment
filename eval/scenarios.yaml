@@ -1,0 +1,37 @@
+# Demo/eval scenarios. All run on the same code; only the task text differs.
+#   answers  : replies given (in order) to clarification questions
+#   approve  : how approval requests are answered
+#   expect   : ground truth read back from the LedgerOps API after the run
+#   expect_approval / expect_clarification : whether a human must have been asked
+
+- name: acme_latest_invoice
+  task: "Find the latest invoice from Acme Corp in the inbox and enter it into LedgerOps."
+  approve: true
+  answers: []
+  expect_approval: false
+  expect_clarification: false
+  expect: {invoice_number: INV-2026-1047, vendor_name: Acme Corp, amount: 48250.0, currency: INR, due_date: "2026-10-31"}
+
+- name: ambiguous_acme
+  task: "Find the latest invoice from Acme in the inbox and enter it into LedgerOps."
+  approve: true
+  answers: ["Acme Corp"]
+  expect_approval: false
+  expect_clarification: true
+  expect: {invoice_number: INV-2026-1047, vendor_name: Acme Corp, amount: 48250.0, currency: INR, due_date: "2026-10-31"}
+
+- name: initech_needs_approval
+  task: "Enter the Initech invoice from the inbox into LedgerOps."
+  approve: true
+  answers: []
+  expect_approval: true
+  expect_clarification: false
+  expect: {invoice_number: INIT-2026-077, vendor_name: Initech, amount: 240000.0, currency: INR, due_date: "2026-11-15"}
+
+- name: globex_details_in_body
+  task: "Enter the Globex Ltd invoice from the inbox into LedgerOps."
+  approve: true
+  answers: []
+  expect_approval: false
+  expect_clarification: false
+  expect: {invoice_number: GLX-5520, vendor_name: Globex Ltd, amount: 18400.0, currency: INR, due_date: "2026-10-25"}

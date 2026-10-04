@@ -1,0 +1,36 @@
+{# Shared layout for LedgerOps. Errors use role="alert", success banners role="status",
+   so the agent can classify page outcomes without app-specific selectors. #}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>{% block title %}LedgerOps{% endblock %} - LedgerOps</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 0; background: #f5f7f5; color: #1c2a22; }
+    header { background: #136f4a; color: #fff; padding: 12px 24px; display: flex; gap: 24px; align-items: center; }
+    header a { color: #fff; text-decoration: none; }
+    header .brand { font-weight: 700; font-size: 18px; }
+    main { max-width: 960px; margin: 24px auto; background: #fff; padding: 24px; border-radius: 8px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 8px; border-bottom: 1px solid #e1e8e3; }
+    label { display: block; margin-top: 12px; font-weight: 600; }
+    input, select, textarea { width: 100%; padding: 8px; box-sizing: border-box; }
+    button { margin-top: 16px; padding: 8px 16px; background: #136f4a; color: #fff; border: 0; border-radius: 4px; cursor: pointer; }
+    .field-error, .error { color: #b00020; margin: 4px 0; }
+    .warning { background: #fff4d6; color: #7a5200; padding: 8px; border-radius: 4px; }
+    .ok { background: #e3f6e8; color: #145c2c; padding: 8px; border-radius: 4px; }
+    #announcement-modal { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+    #announcement-modal .box { background: #fff; padding: 24px; border-radius: 8px; max-width: 420px; }
+  </style>
+</head>
+<body>
+  <header>
+    <span class="brand">LedgerOps</span>
+    <a href="/invoices" id="nav-invoices">Invoices</a>
+    <a href="/invoices/new" id="nav-new-invoice">New invoice</a>
+    <a href="/vendors" id="nav-vendors">Vendors</a>
+  </header>
+  <main>{% block content %}{% endblock %}</main>
+  {% block overlay %}{% endblock %}
+</body>
+</html>

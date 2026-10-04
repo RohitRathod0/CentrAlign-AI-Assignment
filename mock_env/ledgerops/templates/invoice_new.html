@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}New invoice{% endblock %}
+{% block content %}
+<h1>New invoice</h1>
+{% if duplicate %}
+<p id="duplicate-warning" class="warning" role="alert">
+  Duplicate: invoice {{ duplicate.invoice_number }} already exists as
+  <a href="/invoices/{{ duplicate.id }}">{{ duplicate.record_id }}</a>. It was not saved again.
+</p>
+{% endif %}
+<form method="post" action="/invoices" id="invoice-form">
+  <label for="vendor_id">Vendor</label>
+  <select id="vendor_id" name="vendor_id">
+    <option value="">-- select vendor --</option>
+    {% for v in vendors %}
+    <option value="{{ v.id }}" {% if values.vendor_id|string == v.id|string %}selected{% endif %}>{{ v.name }}</option>
+    {% endfor %}
+  </select>
+  {% if errors.vendor_id %}<p class="field-error" role="alert">Vendor: {{ errors.vendor_id }}</p>{% endif %}
+
+  <label for="invoice_number">Invoice number</label>
+  <input id="invoice_number" name="invoice_number" type="text" value="{{ values.invoice_number or '' }}">
+  {% if errors.invoice_number %}<p class="field-error" role="alert">Invoice number: {{ errors.invoice_number }}</p>{% endif %}
+
+  <label for="amount">Amount</label>
+  <input id="amount" name="amount" type="text" inputmode="decimal" value="{{ values.amount or '' }}">
+  {% if errors.amount %}<p class="field-error" role="alert">Amount: {{ errors.amount }}</p>{% endif %}
+
+  <label for="currency">Currency</label>
+  <select id="currency" name="currency">
+    {% for c in currencies %}<option value="{{ c }}" {% if values.currency == c %}selected{% endif %}>{{ c }}</option>{% endfor %}
+  </select>
+  {% if errors.currency %}<p class="field-error" role="alert">Currency: {{ errors.currency }}</p>{% endif %}
+
+  <label for="due_date">Due date</label>
+  <input id="due_date" name="due_date" type="date" value="{{ values.due_date or '' }}">
+  {% if errors.due_date %}<p class="field-error" role="alert">Due date: {{ errors.due_date }}</p>{% endif %}
+
+  <label for="notes">Notes</label>
+  <textarea id="notes" name="notes" rows="3">{{ values.notes or '' }}</textarea>
+
+  <button type="submit" id="invoice-submit">Save invoice</button>
+</form>
+{% endblock %}
+{% block overlay %}
+{% if show_modal %}
+<div id="announcement-modal" role="dialog" aria-modal="true" aria-labelledby="announcement-title">
+  <div class="box">
+    <h2 id="announcement-title">Announcement</h2>
+    <p>Quarter-end close starts Monday. Please submit all pending invoices by Friday.</p>
+    <button type="button" id="announcement-dismiss"
+            onclick="document.getElementById('announcement-modal').remove()">Dismiss</button>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
